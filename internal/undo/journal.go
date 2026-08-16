@@ -75,6 +75,9 @@ func Load(path string) (*Journal, error) {
 	if err != nil {
 		return nil, fmt.Errorf("读取撤销记录 %q: %w", path, err)
 	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil, nil
+	}
 
 	var journal Journal
 	if err := json.Unmarshal(data, &journal); err != nil {
