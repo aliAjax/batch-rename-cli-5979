@@ -69,7 +69,6 @@ func runApply(args []string) int {
 	}
 
 	fmt.Printf("\n撤销记录: %s\n", journalPath)
-	defer os.Remove(journalPath)
 	applied := 0
 	applyErr := fileops.Apply(fileOperations, func(index int, operation fileops.Operation, opErr error) {
 		if opErr != nil {
