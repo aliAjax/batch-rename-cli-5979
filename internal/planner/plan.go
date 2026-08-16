@@ -2,6 +2,7 @@ package planner
 
 import (
 	"path"
+	"strings"
 
 	"batch-rename-cli/internal/fileops"
 	"batch-rename-cli/internal/rules"
@@ -49,6 +50,17 @@ func Build(directory string, entries, existingEntries []fileops.Entry, engine *r
 	for index, entry := range entries {
 		newName := engine.Rename(entry.Name, index)
 		target := joinRelative(path.Dir(entry.RelativePath), newName)
+		if strings.ContainsAny(newName, `/\`) {
+			item := Item{
+				Index:  index,
+				Source: entry.RelativePath,
+				Target: target,
+				Status: StatusConflictExisting,
+				Reason: "生成的目标名称包含路径分隔符",
+			}
+			plan.Items = append(plan.Items, item)
+			continue
+		}
 		item := Item{
 			Index:  index,
 			Source: entry.RelativePath,

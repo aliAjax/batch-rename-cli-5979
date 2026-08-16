@@ -1,6 +1,8 @@
 package rules
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // SequenceConfig controls sequential renaming.
 type SequenceConfig struct {
@@ -31,8 +33,8 @@ func (c Config) Validate() error {
 	}
 
 	for _, replacement := range c.Replacements {
-		if replacement.Old == "" {
-			return fmt.Errorf("--replace 的旧关键词不能为空")
+		if err := ValidateReplacement(replacement); err != nil {
+			return err
 		}
 	}
 

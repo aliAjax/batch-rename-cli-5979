@@ -129,10 +129,14 @@ func parseReplacements(values []string) ([]rules.Replacement, error) {
 		if separator <= 0 {
 			return nil, fmt.Errorf("--replace 格式应为 old=new 或 old:new，收到 %q", value)
 		}
-		replacements = append(replacements, rules.Replacement{
+		replacement := rules.Replacement{
 			Old: value[:separator],
 			New: value[separator+1:],
-		})
+		}
+		if err := rules.ValidateReplacement(replacement); err != nil {
+			return nil, err
+		}
+		replacements = append(replacements, replacement)
 	}
 	return replacements, nil
 }

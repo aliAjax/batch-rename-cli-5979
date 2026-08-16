@@ -32,6 +32,16 @@ type Replacement struct {
 	New string
 }
 
+func ValidateReplacement(replacement Replacement) error {
+	if replacement.Old == "" {
+		return fmt.Errorf("--replace 的旧关键词不能为空")
+	}
+	if strings.ContainsAny(replacement.New, `/\`) {
+		return fmt.Errorf("--replace 的新关键词不能包含路径分隔符: %q", replacement.New)
+	}
+	return nil
+}
+
 // ReplaceRule replaces all occurrences of each configured keyword.
 type ReplaceRule struct {
 	Replacements []Replacement
