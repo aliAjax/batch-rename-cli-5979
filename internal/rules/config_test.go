@@ -59,3 +59,12 @@ func TestEngine(t *testing.T) {
 		t.Fatalf("unexpected sequence result: %s", got)
 	}
 }
+
+func TestConfigRejectsPathSeparatorInReplacement(t *testing.T) {
+	config := Config{
+		Replacements: []Replacement{{Old: "draft", New: "final/v2"}},
+	}
+	if err := config.Validate(); err == nil {
+		t.Fatal("expected replacement new value containing a path separator to be rejected")
+	}
+}
