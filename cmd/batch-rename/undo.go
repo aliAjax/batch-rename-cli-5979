@@ -32,6 +32,10 @@ func runUndo(args []string) int {
 		fmt.Fprintf(os.Stderr, "读取撤销记录失败: %v\n", err)
 		return 1
 	}
+	if journal == nil {
+		fmt.Fprintf(os.Stderr, "读取撤销记录失败: 记录内容为空\n")
+		return 1
+	}
 
 	fmt.Printf("撤销记录: %s\n", journalPath)
 	fmt.Printf("记录目录: %s\n", journal.Directory)

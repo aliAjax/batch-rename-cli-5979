@@ -76,7 +76,7 @@ func Load(path string) (*Journal, error) {
 		return nil, fmt.Errorf("读取撤销记录 %q: %w", path, err)
 	}
 	if len(strings.TrimSpace(string(data))) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("撤销记录 %q 为空", path)
 	}
 
 	var journal Journal
