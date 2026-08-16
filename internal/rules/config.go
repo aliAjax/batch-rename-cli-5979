@@ -1,6 +1,9 @@
 package rules
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // SequenceConfig controls sequential renaming.
 type SequenceConfig struct {
@@ -33,6 +36,12 @@ func (c Config) Validate() error {
 	for _, replacement := range c.Replacements {
 		if replacement.Old == "" {
 			return fmt.Errorf("--replace 的旧关键词不能为空")
+		}
+		if strings.ContainsRune(replacement.Old, '/') {
+			return fmt.Errorf("--replace 的旧关键词不能包含路径分隔符: %q", replacement.Old)
+		}
+		if strings.ContainsRune(replacement.New, '/') {
+			return fmt.Errorf("--replace 的新关键词不能包含路径分隔符: %q", replacement.New)
 		}
 	}
 
