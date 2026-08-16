@@ -90,7 +90,7 @@ func Scan(root, pattern string, recursive bool) (ScanResult, error) {
 		return allEntries[i].RelativePath < allEntries[j].RelativePath
 	})
 
-	candidates := make([]Entry, 0, len(allEntries))
+	candidates := allEntries[:0]
 	for _, entry := range allEntries {
 		matched, matchErr := path.Match(pattern, entry.Name)
 		if matchErr != nil {

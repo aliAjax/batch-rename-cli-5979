@@ -6,7 +6,7 @@ import (
 )
 
 func excludeJournalEntries(entries []fileops.Entry) []fileops.Entry {
-	filtered := make([]fileops.Entry, 0, len(entries))
+	filtered := entries[:0]
 	for _, entry := range entries {
 		if undo.IsInternalName(entry.Name) {
 			continue
