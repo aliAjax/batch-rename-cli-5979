@@ -35,6 +35,13 @@ type Journal struct {
 	Operations []Operation `json:"operations"`
 }
 
+// StatusUpdate describes one journal operation status change.
+type StatusUpdate struct {
+	Index  int
+	Status string
+	Error  string
+}
+
 // IsJournalName reports whether a file name belongs to this tool's undo records.
 func IsJournalName(name string) bool {
 	return strings.HasPrefix(name, journalPrefix) && strings.HasSuffix(name, journalSuffix)
@@ -125,6 +132,35 @@ func UpdateStatus(path string, index int, status, errorMessage string) error {
 	journal.Operations[index].Status = status
 	journal.Operations[index].Error = errorMessage
 	return writeAtomic(path, journal)
+}
+
+// UpdateStatuses applies a batch of status changes with a single journal load
+// and write, which avoids repeatedly rewriting the same file during apply.
+func UpdateStatuses(path string, updates []StatusUpdate) error {
+	journal, err := Load(path)
+	if err != nil {
+		return err
+	}
+	for _, update := range updates {
+		if update.Index < 0 || update.Index >= len(journal.Operations) {
+			return fmt.Errorf("撤销记录操作索引越界: %d", update.Index)
+		}
+		journal.Operations[update.Index].Status = update.Status
+		journal.Operations[update.Index].Error = update.Error
+	}
+	return writeAtomic(path, journal)
+}
+
+// Delete removes an undo journal file. Callers should only delete a journal
+// after a failed apply, never after a successful one.
+func Delete(path string) error {
+	if path == "" {
+		return fmt.Errorf("撤销记录路径为空")
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("删除撤销记录 %q: %w", path, err)
+	}
+	return nil
 }
 
 func createJournalPath(directory string) (string, error) {

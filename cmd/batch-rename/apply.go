@@ -69,28 +69,50 @@ func runApply(args []string) int {
 	}
 
 	fmt.Printf("\n撤销记录: %s\n", journalPath)
-	defer os.Remove(journalPath)
-	applied := 0
-	applyErr := fileops.Apply(fileOperations, func(index int, operation fileops.Operation, opErr error) {
-		if opErr != nil {
-			if updateErr := undo.UpdateStatus(journalPath, index, undo.StatusFailed, opErr.Error()); updateErr != nil {
-				fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
+	removeJournal := true
+	defer func() {
+		if removeJournal {
+			if removeErr := undo.Delete(journalPath); removeErr != nil {
+				fmt.Fprintf(os.Stderr, "清理撤销记录失败: %v\n", removeErr)
 			}
-			fmt.Fprintf(os.Stderr, "应用失败: %v\n", opErr)
-			return
 		}
-		if updateErr := undo.UpdateStatus(journalPath, index, undo.StatusApplied, ""); updateErr != nil {
-			fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
+	}()
+	applied := 0
+	type observation struct {
+		index int
+		err   error
+	}
+	var observations []observation
+	applyErr := fileops.Apply(fileOperations, func(index int, operation fileops.Operation, opErr error) {
+		observations = append(observations, observation{index: index, err: opErr})
+		if opErr != nil {
+			fmt.Fprintf(os.Stderr, "应用失败: %v\n", opErr)
 			return
 		}
 		applied++
 		fmt.Printf("  已重命名: %s -> %s\n", operation.Source, operation.Target)
 	})
+
+	updates := make([]undo.StatusUpdate, 0, len(observations))
+	for _, observation := range observations {
+		status := undo.StatusApplied
+		message := ""
+		if observation.err != nil {
+			status = undo.StatusFailed
+			message = observation.err.Error()
+		}
+		updates = append(updates, undo.StatusUpdate{Index: observation.index, Status: status, Error: message})
+	}
+	if updateErr := undo.UpdateStatuses(journalPath, updates); updateErr != nil {
+		fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
+		return 1
+	}
 	if applyErr != nil {
 		fmt.Fprintf(os.Stderr, "\n应用中断: %v\n", applyErr)
 		return 1
 	}
 
+	removeJournal = false
 	fmt.Printf("\n应用完成: 成功 %d 个，跳过冲突 %d 个。\n", applied, len(plan.Conflicts()))
 	return 0
 }
