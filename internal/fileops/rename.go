@@ -25,23 +25,28 @@ func Rename(source, target string) error {
 	return nil
 }
 
-// Apply runs operations in order and invokes observer after each attempt.
-// It stops on the first error.
+// Apply runs the renames concurrently (one goroutine per operation) and
+// invokes observer after each attempt. Each operation is dispatched exactly
+// once via its slice index, so no work is skipped or duplicated.
+//
+// Observer calls are serialized with a mutex: the observer does not need to
+// be safe for concurrent use. A failed rename is reported via observer but
+// does not abort the remaining operations.
 func Apply(operations []Operation, observer func(index int, operation Operation, err error)) error {
 	var wg sync.WaitGroup
-	next := 0
-	for range operations {
+	var mu sync.Mutex
+	for i := range operations {
 		wg.Add(1)
-		go func() {
+		go func(index int) {
 			defer wg.Done()
-			index := next
-			next++
 			operation := operations[index]
 			err := Rename(operation.Source, operation.Target)
 			if observer != nil {
+				mu.Lock()
 				observer(index, operation, err)
+				mu.Unlock()
 			}
-		}()
+		}(i)
 	}
 	wg.Wait()
 	return nil
