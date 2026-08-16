@@ -3,6 +3,7 @@ package fileops
 import (
 	"fmt"
 	"os"
+	"sync"
 )
 
 // Operation is a single planned rename.
@@ -27,14 +28,21 @@ func Rename(source, target string) error {
 // Apply runs operations in order and invokes observer after each attempt.
 // It stops on the first error.
 func Apply(operations []Operation, observer func(index int, operation Operation, err error)) error {
-	for index, operation := range operations {
-		err := Rename(operation.Source, operation.Target)
-		if observer != nil {
-			observer(index, operation, err)
-		}
-		if err != nil {
-			return err
-		}
+	var wg sync.WaitGroup
+	next := 0
+	for range operations {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			index := next
+			next++
+			operation := operations[index]
+			err := Rename(operation.Source, operation.Target)
+			if observer != nil {
+				observer(index, operation, err)
+			}
+		}()
 	}
+	wg.Wait()
 	return nil
 }

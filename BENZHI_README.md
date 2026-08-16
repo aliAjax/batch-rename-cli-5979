@@ -1,4 +1,4 @@
-# batch-rename-cli-5979
+# batch-rename-cli__001
 
 ## 标准命令
 
