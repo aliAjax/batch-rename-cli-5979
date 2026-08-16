@@ -28,21 +28,57 @@ func Rename(source, target string) error {
 // Apply runs operations in order and invokes observer after each attempt.
 // It stops on the first error.
 func Apply(operations []Operation, observer func(index int, operation Operation, err error)) error {
-	var wg sync.WaitGroup
-	next := 0
-	for range operations {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	if len(operations) == 0 {
+		return nil
+	}
+
+	const workerCount = 8
+	workers := workerCount
+	if len(operations) < workers {
+		workers = len(operations)
+	}
+
+	var (
+		mu       sync.Mutex
+		next     int
+		firstErr error
+		stopped  bool
+		wg       sync.WaitGroup
+	)
+
+	run := func() {
+		defer wg.Done()
+		for {
+			mu.Lock()
+			if stopped || next >= len(operations) {
+				mu.Unlock()
+				return
+			}
 			index := next
 			next++
 			operation := operations[index]
+			mu.Unlock()
+
 			err := Rename(operation.Source, operation.Target)
 			if observer != nil {
 				observer(index, operation, err)
 			}
-		}()
+			if err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+					stopped = true
+				}
+				mu.Unlock()
+				return
+			}
+		}
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go run()
 	}
 	wg.Wait()
-	return nil
+	return firstErr
 }

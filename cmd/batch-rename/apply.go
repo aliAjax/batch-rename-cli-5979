@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"sync"
 
 	"batch-rename-cli/internal/fileops"
 	"batch-rename-cli/internal/planner"
@@ -69,22 +71,45 @@ func runApply(args []string) int {
 	}
 
 	fmt.Printf("\n撤销记录: %s\n", journalPath)
-	applied := 0
+	type observation struct {
+		index     int
+		operation fileops.Operation
+		err       error
+	}
+	var (
+		mu           sync.Mutex
+		observations []observation
+		applied      int
+	)
 	applyErr := fileops.Apply(fileOperations, func(index int, operation fileops.Operation, opErr error) {
+		mu.Lock()
+		observations = append(observations, observation{index: index, operation: operation, err: opErr})
+		if opErr == nil {
+			applied++
+		}
+		mu.Unlock()
 		if opErr != nil {
-			if updateErr := undo.UpdateStatus(journalPath, index, undo.StatusFailed, opErr.Error()); updateErr != nil {
-				fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
-			}
 			fmt.Fprintf(os.Stderr, "应用失败: %v\n", opErr)
 			return
 		}
-		if updateErr := undo.UpdateStatus(journalPath, index, undo.StatusApplied, ""); updateErr != nil {
-			fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
-			return
-		}
-		applied++
 		fmt.Printf("  已重命名: %s -> %s\n", operation.Source, operation.Target)
 	})
+
+	sort.Slice(observations, func(i, j int) bool {
+		return observations[i].index < observations[j].index
+	})
+	for _, observation := range observations {
+		status := undo.StatusApplied
+		message := ""
+		if observation.err != nil {
+			status = undo.StatusFailed
+			message = observation.err.Error()
+		}
+		if updateErr := undo.UpdateStatus(journalPath, observation.index, status, message); updateErr != nil {
+			fmt.Fprintf(os.Stderr, "更新撤销记录失败: %v\n", updateErr)
+			return 1
+		}
+	}
 	if applyErr != nil {
 		fmt.Fprintf(os.Stderr, "\n应用中断: %v\n", applyErr)
 		return 1
